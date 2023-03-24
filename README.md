@@ -3,6 +3,7 @@
 Here's an example of how to use the `Classification` class to predict scores for different categories based on a given text:
 
 ```python
+from classy import split_fn, Classification
 my_class = Classification()
 text = "การบริการดีสัดครับ"
 negative_score = my_class.predict_negative(text)
