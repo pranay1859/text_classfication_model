@@ -4,12 +4,18 @@ Here's an example of how to use the `Classification` class to predict scores for
 
 ```python
 from text_classfication_model.classy import split_fn, Classification
-my_class = Classification()
-text = "การบริการดีสัดครับ"
-negative_score = my_class.predict_negative(text)
-positive_score = my_class.predict_possitve(text)
-male_score = my_class.predict_male(text)
-female_score = my_class.predict_female(text)
-toxic_score = my_class.predict_toxic(text)
-all_score = my_class.predict_all(text)
+
+msg_test = pd.read_csv("msg_df_nir.csv")
+dump_df = msg_test.head(100000)
+dump_df = dump_df.convert_dtypes()
+dump_df.message.fillna("", inplace=True)
+
+# Prediction all
+my_class = Classification(dump_df)
+all_score = my_class.predict_all()
+
+# Prediction one col
+my_class = Classification(dump_df)
+predict_female_df = my_class.predict_female()
+
 ```
