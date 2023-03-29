@@ -3,13 +3,16 @@ import pickle
 from pythainlp.util import dict_trie
 from pythainlp.corpus.common import thai_words
 from pythainlp.tokenize import Tokenizer, word_tokenize
+from functools import reduce
 
 def split_fn(x):
     return x.split(' ')
 
 class Classification(object):
-    def __init__(self):
+    def __init__(self, df):
         self.custom_tokenizer = self.custom_token()
+        self.df = df
+        self.df["token"] = self.df["message"].apply(self.clean_text)
 
         self.enc_possitive = pickle.load(open('./text_classfication_model/encoder_content_possitive.pickle', 'rb'))
         self.norm_possitive = pickle.load(open('./text_classfication_model/normalizer_content_possitive.pickle', 'rb'))
@@ -49,62 +52,48 @@ class Classification(object):
         custom_tokenizer = Tokenizer(custom_dict=trie, engine='newmm')
         return custom_tokenizer
     
-    def clean_text(self, text):
-        text = re.sub("\s+", "", text)
-        new_texts = ' '.join([word for word in self.custom_tokenizer.word_tokenize(text)])
-        return new_texts
+    def clean_text(self,text):
+        return ' '.join(self.custom_tokenizer.word_tokenize(re.sub('[^\u0E00-\u0E7Fa-zA-Z0-9]+', '', text)))
 
-    def predict_possitve(self, text):
-        new_texts = self.clean_text(text)
-        new_text_bow = self.enc_possitive.transform([new_texts])
-        new_text_normalized = self.norm_possitive.transform(new_text_bow)
-        prediction = self.positive_model.predict(new_text_normalized)[0]
-        prediction_score = self.positive_model._predict_proba_lr(new_text_normalized)[:,1]
-        return prediction, prediction_score[0]
+    def predict_possitve(self):
+        mfeat = self.enc_possitive.transform(self.df['token'].values)
+        normalized = self.norm_possitive.transform(mfeat)
+        self.df['possitve_type'] = self.positive_model.predict(normalized)
+        self.df['possitve_score'] = self.positive_model._predict_proba_lr(mfeat)[:,1]
+        return self.df[['message','possitve_type', 'possitve_score']]
 
-    def predict_negative(self, text):
-        new_texts = self.clean_text(text)
-        new_text_bow = self.enc_negative.transform([new_texts])
-        new_text_normalized = self.norm_negative.transform(new_text_bow)
-        prediction = self.negative_model.predict(new_text_normalized)[0]
-        prediction_score = self.negative_model._predict_proba_lr(new_text_normalized)[:,1]
-        return prediction, prediction_score[0]
+    def predict_negative(self):
+        mfeat = self.enc_negative.transform(self.df['token'].values)
+        normalized = self.norm_negative.transform(mfeat)
+        self.df['negative_type'] = self.negative_model.predict(normalized)
+        self.df['negativen_score'] = self.negative_model._predict_proba_lr(mfeat)[:,1]
+        return self.df[['message','negative_type', 'negativen_score']]
     
-    def predict_male(self, text):
-        new_texts = self.clean_text(text)
-        new_text_bow = self.enc_male.transform([new_texts])
-        new_text_normalized = self.norm_male.transform(new_text_bow)
-        prediction = self.male_model.predict(new_text_normalized)[0]
-        prediction_score = self.male_model._predict_proba_lr(new_text_normalized)[:,1]
-        return prediction, prediction_score[0]
+    def predict_male(self):
+        mfeat = self.enc_male.transform(self.df['token'].values)
+        normalized = self.norm_male.transform(mfeat)
+        self.df['male_type'] = self.male_model.predict(normalized)
+        self.df['male_score'] = self.male_model._predict_proba_lr(mfeat)[:,1]
+        return self.df[['message','male_type', 'male_score']]
 
-    def predict_female(self, text):
-        new_texts = self.clean_text(text)
-        new_text_bow = self.enc_female.transform([new_texts])
-        new_text_normalized = self.norm_female.transform(new_text_bow)
-        prediction = self.female_model.predict(new_text_normalized)[0]
-        prediction_score = self.female_model._predict_proba_lr(new_text_normalized)[:,1]
-        return prediction, prediction_score[0]
+    def predict_female(self):
+        mfeat =  self.enc_female.transform(self.df['token'].values)
+        normalized = self.norm_female.transform(mfeat)
+        self.df['female_type'] = self.female_model.predict(normalized)
+        self.df['female_score'] = self.female_model._predict_proba_lr(mfeat)[:,1]
+        return self.df[['message','female_type', 'female_score']]
     
-    def predict_toxic(self, text):
-        new_texts = self.clean_text(text)
-        new_text_bow = self.enc_toxic.transform([new_texts])
-        new_text_normalized = self.norm_toxic.transform(new_text_bow)
-        prediction = self.toxic_model.predict(new_text_normalized)[0]
-        prediction_score = self.toxic_model._predict_proba_lr(new_text_normalized)[:,1]
-        return prediction, prediction_score[0]
+    def predict_toxic(self):
+        mfeat = self.enc_toxic.transform(self.df['token'].values)
+        normalized = self.norm_toxic.transform(mfeat)
+        self.df['toxic_type'] = self.toxic_model.predict(normalized)
+        self.df['toxic_score'] = self.toxic_model._predict_proba_lr(mfeat)[:,1]
+        return self.df[['message','toxic_type', 'toxic_score']]
     
-    def predict_all(self, text):
-        pre_p, sc_p = self.predict_possitve(text)
-        pre_n, sc_n = self.predict_negative(text)
-        pre_m, sc_m = self.predict_male(text)
-        pre_f, sc_f = self.predict_female(text)
-        pre_t, sc_t = self.predict_toxic(text)
-
-        return {'text' :text,
-                'possitve': {pre_p:sc_p },
-                'negative': {pre_n:sc_n},
-                'male'    : {pre_m:sc_m},
-                'female'  : {pre_f:sc_f},
-                'toxic'   : {pre_t:sc_t}
-                }
+    def predict_all(self):
+        self.predict_possitve()
+        self.predict_negative()
+        self.predict_male()
+        self.predict_female()
+        self.predict_toxic()
+        return self.df
